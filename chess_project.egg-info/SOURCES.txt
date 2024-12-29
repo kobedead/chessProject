@@ -1,0 +1,7 @@
+README.md
+setup.py
+chess_project.egg-info/PKG-INFO
+chess_project.egg-info/SOURCES.txt
+chess_project.egg-info/dependency_links.txt
+chess_project.egg-info/requires.txt
+chess_project.egg-info/top_level.txt

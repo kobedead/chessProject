@@ -26,7 +26,8 @@ class Agent(ABC):
         self.utility.self_color = board.turn
         self.utility.enemy_color = not board.turn
 
-        self.dont_return = False
+        self.utility.prev_bestValue = -math.inf
+
 
         self.start_time = time.time()
         self.delta_time = 0.0
@@ -48,17 +49,18 @@ class Agent(ABC):
 
     def min_max(self, board: chess.Board, depth, init_depth, alpha, beta, trueIfMax):
 
+
+
         if (depth == 0) or (time.time() - self.start_time) > self.time_limit_move:
             self.expanded_nodes += + 1
             u = self.utility.quiescence_search(board, alpha, beta)
             return u
 
-        moves_with_values = [(move, self.utility.move_value(board, move)) for move in board.legal_moves]
-        mover_ordering = [move for move, _ in sorted(moves_with_values, key=lambda x: x[1], reverse=True)]
+        sorted_moves = sorted(board.legal_moves, key=lambda move: self.utility.move_value(board, move), reverse=True)
 
         if trueIfMax:  # we need to get the max from children
 
-            for childMoves in mover_ordering:
+            for childMoves in sorted_moves:
 
                 self.expanded_nodes = self.expanded_nodes + 1
 
@@ -67,6 +69,7 @@ class Agent(ABC):
                 board.pop()
 
                 if (depth == init_depth and value > self.utility.prev_bestValue):
+                    print("childmoves : " ,childMoves)
                     self.utility.prev_bestMove = childMoves
                     self.utility.prev_bestValue = value
 
@@ -77,7 +80,7 @@ class Agent(ABC):
             return alpha
 
         elif not trueIfMax:  # we need to get the min from children
-            for childMoves in mover_ordering:
+            for childMoves in sorted_moves:
 
                 self.expanded_nodes = self.expanded_nodes + 1
 

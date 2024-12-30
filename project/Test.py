@@ -22,7 +22,7 @@ if __name__ == "__main__":
     moves = list(game.mainline_moves())
 
     # Play up to a random move in the game
-    for move in moves[:20]:
+    for move in moves[:1]:
         board.push(move)
 
     print(board.turn)

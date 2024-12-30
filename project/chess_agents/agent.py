@@ -22,20 +22,19 @@ class Agent(ABC):
 
     def calculate_move(self, board: chess.Board):
 
-        self.expanded_nodes = 0
-        self.utility.self_color = board.turn
-        self.utility.enemy_color = not board.turn
-
         self.utility.prev_bestValue = -math.inf
 
-
+        self.expanded_nodes = 0
         self.start_time = time.time()
         self.delta_time = 0.0
 
         depth = 0
 
+        #iterative deepning
         while (self.delta_time < self.time_limit_move):
-            best_score = self.min_max(board, depth, depth, -math.inf, +math.inf, True)
+            self.utility.prev_bestValue = -math.inf
+
+            self.negamax(board, depth, depth, -math.inf, +math.inf)
 
             depth += 1
 
@@ -46,6 +45,68 @@ class Agent(ABC):
         print(depth)
         print(self.utility.prev_bestValue)
         return self.utility.prev_bestMove
+
+    def negamax(self, board: chess.Board, depth, init_depth, alpha, beta):
+
+        if (depth == 0) or (time.time() - self.start_time) > self.time_limit_move:
+            self.expanded_nodes += + 1
+            u = self.utility.quiescence_search(board, alpha, beta)
+            print(u)
+            return u
+
+        best_move = None
+        best_score = -math.inf
+
+
+        sorted_moves = sorted(board.legal_moves, key=lambda move: self.utility.move_value(board, move), reverse=True)
+
+        for childMoves in sorted_moves:
+            self.expanded_nodes = self.expanded_nodes + 1
+
+
+
+            board.push(childMoves)
+
+            # if threefold repetition we do not analyze this position
+            if board.can_claim_threefold_repetition():
+                board.pop()
+                continue
+
+            value = -self.negamax(board, depth - 1, init_depth, -alpha, -beta)
+            board.pop()
+
+
+            if value >= best_score :
+                 best_score = value
+                 best_move = childMoves
+
+
+            alpha = max(alpha, best_score)
+
+            if (beta <= alpha):
+                break
+
+
+        if(depth == init_depth) :
+            self.utility.prev_bestValue = best_score
+            self.utility.prev_bestMove = best_move
+
+
+        return best_score
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def min_max(self, board: chess.Board, depth, init_depth, alpha, beta, trueIfMax):
 
@@ -69,7 +130,6 @@ class Agent(ABC):
                 board.pop()
 
                 if (depth == init_depth and value > self.utility.prev_bestValue):
-                    print("childmoves : " ,childMoves)
                     self.utility.prev_bestMove = childMoves
                     self.utility.prev_bestValue = value
 

@@ -56,7 +56,6 @@ class Utility(ABC):
     def eval(self ,board : chess.Board) :
 
 
-
         if board.is_checkmate():
             return float('-inf') if board.turn else float('inf')  # Negative for current player if checkmate
 
@@ -142,9 +141,10 @@ class Utility(ABC):
     def quiescence_search(self, board : chess.Board, alpha, beta):
 
         stand_pat = self.eval(board)
+        best_value = stand_pat
         # Alpha-beta pruning
         if stand_pat >= beta:
-            return beta
+            return stand_pat
         alpha = max(alpha, stand_pat)
 
         # Generate all capture moves
@@ -155,10 +155,11 @@ class Utility(ABC):
             board.pop()
             # Alpha-beta pruning
             if score >= beta:
-                return beta
+                return score
+            best_value = max(score,best_value)
             alpha = max(alpha, score)
 
-        return alpha
+        return best_value
 
 
 

@@ -11,11 +11,6 @@ class Utility(ABC):
 
     def __init__(self) -> None:
         """Setup the Search Agent"""
-        self.self_color = None
-        self.enemy_color = None
-        self.prev_pawns_middle = 0
-        self.prev_knight_middel = 0
-
         self.prev_bestMove = None
         self.prev_bestValue = 0
 
@@ -33,20 +28,28 @@ class Utility(ABC):
 
 
 
+        #parameters
+
+
+
+
+
+
+
     def total_pieces(self , board : chess.Board):
         value = 0
 
-        value += len(board.pieces(piece_type=chess.PAWN, color=self.self_color))
-        value += len(board.pieces(piece_type=chess.BISHOP, color=self.self_color))
-        value += len(board.pieces(piece_type=chess.KNIGHT, color=self.self_color))
-        value += len(board.pieces(piece_type=chess.ROOK, color=self.self_color))
-        value += len(board.pieces(piece_type=chess.QUEEN, color=self.self_color))
+        value += len(board.pieces(piece_type=chess.PAWN, color=chess.WHITE))
+        value += len(board.pieces(piece_type=chess.BISHOP, color=chess.WHITE))
+        value += len(board.pieces(piece_type=chess.KNIGHT, color=chess.WHITE))
+        value += len(board.pieces(piece_type=chess.ROOK, color=chess.WHITE))
+        value += len(board.pieces(piece_type=chess.QUEEN, color=chess.WHITE))
 
-        value += len(board.pieces(piece_type=chess.PAWN, color=self.enemy_color))
-        value += len(board.pieces(piece_type=chess.BISHOP, color=self.enemy_color))
-        value += len(board.pieces(piece_type=chess.KNIGHT, color=self.enemy_color))
-        value += len(board.pieces(piece_type=chess.ROOK, color=self.enemy_color))
-        value += len(board.pieces(piece_type=chess.QUEEN, color=self.enemy_color))
+        value += len(board.pieces(piece_type=chess.PAWN, color=chess.BLACK))
+        value += len(board.pieces(piece_type=chess.BISHOP, color=chess.BLACK))
+        value += len(board.pieces(piece_type=chess.KNIGHT, color=chess.BLACK))
+        value += len(board.pieces(piece_type=chess.ROOK, color=chess.BLACK))
+        value += len(board.pieces(piece_type=chess.QUEEN, color=chess.BLACK))
 
         return value
 
@@ -57,73 +60,102 @@ class Utility(ABC):
 
 
         if board.is_checkmate():
-            return float('-inf') if board.turn else float('inf')  # Negative for current player if checkmate
+            return -math.inf if board.turn else +math.inf
+
 
         if board.is_stalemate() or board.is_insufficient_material():
             return 0  # Draw
 
-        endgame = False if self.total_pieces(board)>14 else True
-
-        white_squaretable = 0
-        black_squaretable =0
-        if board.move_stack :
-            move = board.pop()
-            white_squaretable = PieceSquareTable.get_value(board.piece_at(move.from_square).piece_type , move  , chess.WHITE , endgame )
-            black_squaretable = PieceSquareTable.get_value(board.piece_at(move.from_square).piece_type , move  , chess.BLACK , endgame)
-            board.push(move)
 
 
-        white_matscore = self.material_value( board , chess.WHITE)
-        black_matscore = self.material_value(board , chess.BLACK)
+        #PieceSquareValue
+        white_value = self.getPiecesScuareValue(board , chess.WHITE)/2
+        black_value = self.getPiecesScuareValue(board , chess.BLACK)/2
 
-        eval_pawn = self.evaluate_pawn_structure(board, chess.WHITE)
+        #material value
+        white_value += self.material_value( board , chess.WHITE)*2
+        black_value += self.material_value(board , chess.BLACK)*2
 
-        eval_mob_wh = self.evaluate_mobility(board)
+        #pawnn structure (acttached)
+        white_value += self.evaluate_pawn_structure(board, chess.WHITE)
+        black_value += self.evaluate_pawn_structure(board , chess.BLACK)
+
+        #mobility
+        white_value += len(list(board.legal_moves))  # White mobility
+        board.push(chess.Move.null())
+        black_value += len(list(board.legal_moves))  # Black mobility
+        board.pop()
 
 
         flip_value = 1 if board.turn == chess.WHITE else -1
-        return (white_squaretable-black_squaretable)*flip_value + (white_matscore-black_matscore)*flip_value +eval_mob_wh*flip_value + eval_pawn
+        return (white_value-black_value) *flip_value
 
 
 
-    def material_value(self ,board , active_player ):
-        enemy_player = not active_player
+
+
+
+    def getPiecesScuareValue(self , board , player):
+
+
+            value = PieceSquareTable.get_value(board , chess.BISHOP , player )
+            value += PieceSquareTable.get_value(board , chess.KNIGHT , player )
+            value += PieceSquareTable.get_value(board , chess.ROOK , player)
+            value += PieceSquareTable.get_value(board , chess.QUEEN , player)
+
+            end = 2/self.total_pieces(board)
+
+            value += PieceSquareTable.get_value(board,chess.PAWN , player )*(1-end)
+            value += PieceSquareTable.get_value(board , chess.PAWN , player , True)*(end)
+
+
+            value += PieceSquareTable.get_value(board , chess.KING, player ) *(1-end)
+            value += PieceSquareTable.get_value(board, chess.KING , player , True)*end
+
+            return   value
+
+
+
+
+
+
+    def material_value(self ,board , player ):
         value = 0
-        value += len(board.pieces(piece_type=chess.PAWN, color=active_player)) * chess.PAWN
-        value += len(board.pieces(piece_type=chess.BISHOP, color=active_player)) * chess.BISHOP
-        value += len(board.pieces(piece_type=chess.KNIGHT, color=active_player)) * chess.KNIGHT
-        value += len(board.pieces(piece_type=chess.ROOK, color=active_player)) * chess.ROOK
-        value += len(board.pieces(piece_type=chess.QUEEN, color=active_player)) * chess.QUEEN
-
-        value -= len(board.pieces(piece_type=chess.PAWN, color=enemy_player)) * chess.PAWN
-        value -= len(board.pieces(piece_type=chess.BISHOP, color=enemy_player)) * chess.BISHOP
-        value -= len(board.pieces(piece_type=chess.KNIGHT, color=enemy_player)) * chess.KNIGHT
-        value -= len(board.pieces(piece_type=chess.ROOK, color=enemy_player)) * chess.ROOK
-        value -= len(board.pieces(piece_type=chess.QUEEN, color=enemy_player)) * chess.QUEEN
+        value += len(board.pieces(piece_type=chess.PAWN, color=player)) * self.pawn_value
+        value += len(board.pieces(piece_type=chess.BISHOP, color=player)) * self.bishop_value
+        value += len(board.pieces(piece_type=chess.KNIGHT, color=player)) * self.knight_value
+        value += len(board.pieces(piece_type=chess.ROOK, color=player)) * self.rook_value
+        value += len(board.pieces(piece_type=chess.QUEEN, color=player)) * self.queen_value
 
         return value
 
 
-    def evaluate_pawn_structure(self, board: chess.Board , active_player) -> float:
-        #not nessesary because of quiescence_search , could with pruning?
-        enemy_player = not active_player
+    def evaluate_pawn_structure(self, board: chess.Board , player) -> float:
+
+
+        #not nessesary because of quiescence_search , could with pruning!!
         score = 0
-        for square in board.pieces(chess.PAWN, active_player):
-            if board.is_attacked_by(enemy_player, square):
-                score -= -5
-        for square in board.pieces(chess.PAWN, enemy_player):
-            if board.is_attacked_by(active_player, square):
-                score += 5
+        for square in board.pieces(chess.PAWN, player):
+            #check if passed pawn
+            if player == chess.WHITE :
+                if chess.BB_SQUARES[square] & chess.BB_RANK_7 :
+                    score += 10
+                elif chess.BB_SQUARES[square] & chess.BB_RANK_8 :
+                    score += 20
+            else :
+                if chess.BB_SQUARES[square] & chess.BB_RANK_2 :
+                    score += 10
+                elif chess.BB_SQUARES[square] & chess.BB_RANK_1 :
+                    score += 20
+
+            # Doubled pawns penalty
+            if board.pawns & chess.BB_FILES[chess.square_file(square)] > 1:
+                score -= 5
+
+
+
         return score
 
-    def evaluate_mobility(self , board: chess.Board) -> float:
-        white_mobility = len(list(board.legal_moves))
-        board.turn = not board.turn
-        black_mobility = len(list(board.legal_moves))
-        board.turn = not board.turn
-
-        #print("white mobility : " , white_mobility , " black mobility : " , black_mobility)
-        return (white_mobility - black_mobility)
 
     def evaluate_king_safety( sef ,board: chess.Board , active_player) -> float:
         king_safety = 0
@@ -138,28 +170,6 @@ class Utility(ABC):
 
 
 
-    def quiescence_search(self, board : chess.Board, alpha, beta):
-
-        stand_pat = self.eval(board)
-        best_value = stand_pat
-        # Alpha-beta pruning
-        if stand_pat >= beta:
-            return stand_pat
-        alpha = max(alpha, stand_pat)
-
-        # Generate all capture moves
-        capture_moves = [move for move in board.legal_moves if board.is_capture(move)]
-        for move in capture_moves:
-            board.push(move)
-            score = -self.quiescence_search(board, -beta, -alpha)
-            board.pop()
-            # Alpha-beta pruning
-            if score >= beta:
-                return score
-            best_value = max(score,best_value)
-            alpha = max(alpha, score)
-
-        return best_value
 
 
 
@@ -168,17 +178,26 @@ class Utility(ABC):
 
         value = 0
 
+        #check if its a favorable capture
         if(board.is_capture(move)) :
-            value += 10
+            victim = board.piece_at(move.to_square)
+            attacker = board.piece_at(move.from_square)
+            if victim :
+                value += (victim.piece_type * 10) - attacker.piece_type
+        #check if its a promotion
         elif(move.promotion) :
             value += 20
-        elif(move == self.prev_bestMove) :
-            value = self.prev_bestValue
 
+        #if it was previous found move -> add value
+        if(move == self.prev_bestMove) :
+            value += self.prev_bestValue
 
-        board.push(move)
-        if (board.is_checkmate()):
+        #check if it gives check
+        if board.gives_check(move):
             value += 30
-        board.pop()
+
+        #if move to center
+        if chess.BB_SQUARES[move.to_square] & chess.BB_CENTER :
+            value += 5
 
         return value

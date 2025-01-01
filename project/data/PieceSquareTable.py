@@ -1,4 +1,5 @@
 import chess
+import numpy as np
 
 class PieceSquareTable:
 
@@ -99,24 +100,26 @@ class PieceSquareTable:
         chess.ROOK: ROOKS,
         chess.QUEEN: QUEENS,
         chess.KING: KINGS_START,
+
+
     }
 
     @staticmethod
-    def get_value(piece, move : chess.Move, is_white, is_endgame=False):
+    def get_value(board : chess.Board, piece , player , endgame = False ) :
 
         table = PieceSquareTable.PIECE_TABLES[piece]
+        if(endgame) :
+            if(piece == chess.KING) :
+                table = PieceSquareTable.KINGS_END
+            elif(piece == chess.PAWN):
+                table = PieceSquareTable.PawnsEnd
 
-        if piece == chess.KING :
-            if (chess.BB_SQUARES[move.from_square] & chess.BB_CORNERS) :
-                return 0
 
 
-        if piece == chess.KING and is_endgame:
-            table = PieceSquareTable.KINGS_END
-        elif piece == chess.PAWN and is_endgame :
-            table = PieceSquareTable.PawnsEnd
-        square = move.to_square
-        if not is_white:
-            square = chess.square_mirror(square)
+        piecevalue = 0
+        for square in board.pieces(piece , player):
+            if player == chess.WHITE:
+                 square = chess.square_mirror(square)
+            piecevalue += table[square]
 
-        return table[square]/10
+        return piecevalue

@@ -37,7 +37,7 @@ class Agent(ABC):
         self.start_time = time.time()
         self.delta_time = 0.0
 
-        depth = 5
+        depth = 1
 
         #iterative deepning
         while (self.delta_time < self.time_limit_move):
@@ -178,49 +178,3 @@ class Agent(ABC):
 
 
 
-
-    def min_max(self, board: chess.Board, depth, init_depth, alpha, beta, trueIfMax):
-
-
-
-        if (depth == 0) or (time.time() - self.start_time) > self.time_limit_move:
-            self.expanded_nodes += + 1
-            u = self.utility.quiescence_search(board, alpha, beta)
-            return u
-
-        sorted_moves = sorted(board.legal_moves, key=lambda move: self.utility.move_value(board, move), reverse=True)
-
-        if trueIfMax:  # we need to get the max from children
-
-            for childMoves in sorted_moves:
-
-                self.expanded_nodes = self.expanded_nodes + 1
-
-                board.push(childMoves)
-                value = self.min_max(board, depth - 1, init_depth, alpha, beta, False)
-                board.pop()
-
-                if (depth == init_depth and value > self.utility.prev_bestValue):
-                    self.utility.prev_bestMove = childMoves
-                    self.utility.prev_bestValue = value
-
-                alpha = max(alpha, value)
-                if (beta <= alpha):
-                    break
-
-            return alpha
-
-        elif not trueIfMax:  # we need to get the min from children
-            for childMoves in sorted_moves:
-
-                self.expanded_nodes = self.expanded_nodes + 1
-
-                board.push(childMoves)
-                value = self.min_max(board, depth - 1, init_depth, alpha, beta, True)
-                board.pop()
-                beta = min(beta, value)
-
-                if (beta <= alpha):
-                    break
-
-            return beta

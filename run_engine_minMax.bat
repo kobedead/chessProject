@@ -1,1 +1,0 @@
-C:\Users\kobef\AppData\Local\Programs\Python\Python39\python.exe -m project.chess_engines.minMax_engine

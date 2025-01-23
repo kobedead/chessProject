@@ -1,5 +1,5 @@
 import chess
-from project.chess_agents.agent import Agent
+from project.chess_agents.negamax_agent import Agent
 
 class UciEngine():
     

@@ -1,10 +1,10 @@
 import math
 from abc import ABC
-from datetime import time
+from functools import reduce
 
 import chess
 
-from project.data.PieceSquareTable import PieceSquareTable
+from project.chess_utilities.PieceSquareTable import PieceSquareTable
 
 """A generic utility class"""
 class Utility(ABC):
@@ -23,7 +23,6 @@ class Utility(ABC):
         #ijn board stupid
         self.bitmap_3x3_corners = 0b1110011111100111111001110000000000000000111001111110011111100111
         self.bitmap_2x2_corners = 0b1100001111000011000000000000000000000000000000001100001111000011
-        self.bitmap_corners     = 0b1000000100000000000000000000000000000000000000000000000010000001
         self.bitmap_center4x4 = 0b0000000000000000001111000011110000111100001111000000000000000000
 
 
@@ -31,7 +30,7 @@ class Utility(ABC):
         #parameters
 
 
-    def total_pieces(self , board : chess.Board):
+    def total_pieces(self , board : chess.Board) -> int:
         value = 0
 
         value += len(board.pieces(piece_type=chess.PAWN, color=chess.WHITE))
@@ -48,7 +47,7 @@ class Utility(ABC):
 
         return value
 
-    def total_pieces_color(self , board : chess.Board , color):
+    def total_pieces_color(self , board : chess.Board , color) -> int:
         value = 0
 
         value += len(board.pieces(piece_type=chess.PAWN, color=color))
@@ -72,11 +71,15 @@ class Utility(ABC):
         if board.is_stalemate() or board.is_insufficient_material():
             return 0  # Draw
 
-        end = 2 / self.total_pieces(board)
+
+        #linear transition from global midgame to endgame
+        total_material = self.material_value(board, chess.WHITE) + self.material_value(board, chess.BLACK)
+        endgame_phase = max(0, min(1, (3200 - total_material) / 1200))
+        midgame_phase = (1-endgame_phase)
 
         #PieceSquareValue
-        white_value = self.getPiecesScuareValue(board, chess.WHITE, end )
-        black_value = self.getPiecesScuareValue(board, chess.BLACK,end)
+        white_value = self.getPiecesScuareValue(board, chess.WHITE,endgame_phase)
+        black_value = self.getPiecesScuareValue(board, chess.BLACK,endgame_phase)
 
         #material value
         white_value += self.material_value(board, chess.WHITE)
@@ -86,6 +89,9 @@ class Utility(ABC):
         white_value += self.evaluate_pawn_structure(board, chess.WHITE)
         black_value += self.evaluate_pawn_structure(board, chess.BLACK)
 
+        #king safety
+        white_value += self.pawn_shield(board , chess.WHITE) * midgame_phase
+        black_value += self.pawn_shield(board , chess.BLACK) * midgame_phase
 
         #endgame
         white_value += self.endgame(board , chess.WHITE)
@@ -110,50 +116,6 @@ class Utility(ABC):
 
 
 
-    def endgame(self , board : chess.Board , player ):
-
-        enemy = not player
-        endgame = 0
-
-        end_spec_color = 20/self.total_pieces_color(board,player) + 40/self.total_pieces_color(board, enemy)
-
-
-        #enemy king in corner :
-        if board.pieces_mask(piece_type=chess.KING, color=enemy) & chess.BB_CORNERS:
-            endgame += 30
-        elif board.pieces_mask(piece_type=chess.KING, color=enemy) & self.bitmap_2x2_corners:
-            endgame += 20
-        elif board.pieces_mask(piece_type=chess.KING ,  color=enemy) & self.bitmap_3x3_corners :
-            endgame += 10
-
-
-        #distance between kings needs to close
-        player_king_square = board.pieces(piece_type=chess.KING, color=enemy).pop()
-        enemy_king_square = board.pieces(piece_type=chess.KING, color=player).pop()
-
-        dis = chess.square_manhattan_distance( player_king_square, enemy_king_square)
-        dis = 50/dis*3
-
-        return dis*end_spec_color
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def getPiecesScuareValue(self , board , player , end):
 
 
@@ -173,10 +135,6 @@ class Utility(ABC):
             return value
 
 
-
-
-
-
     def material_value(self ,board , player ):
         value = 0
         value += len(board.pieces(piece_type=chess.PAWN, color=player)) * self.pawn_value
@@ -191,38 +149,129 @@ class Utility(ABC):
     def evaluate_pawn_structure(self, board: chess.Board , player) :
 
 
-        #not nessesary because of quiescence_search , could with pruning!!
         score = 0
+
+        BB_pawns = board.pieces_mask(chess.PAWN, player)
+        BB_enemy_pawns = board.pieces_mask(chess.PAWN, not player)
+
         for square in board.pieces(chess.PAWN, player):
-            #check if passed pawn
+
+
+            file_pawn = chess.square_file(square)
+            rank_pawn = chess.square_rank(square)
+
+            prev_file_BB = chess.BB_FILES[file_pawn - 1 if file_pawn > 0 else 0]
+            next_file_BB = chess.BB_FILES[file_pawn + 1 if file_pawn < 7 else 7]
+
+
+            #now containes rank and neigboring ranks
+            BB_passed_pawn = chess.BB_FILES[file_pawn] | prev_file_BB | next_file_BB
+
             if player == chess.WHITE :
-                if chess.BB_SQUARES[square] & chess.BB_RANK_7 :
-                    score += 10
-                elif chess.BB_SQUARES[square] & chess.BB_RANK_8 :
-                    score += 20
+                # do bitwise or on the list of ranks to get 1 bitmask
+                BB_ranks_ahead = reduce(lambda x, y: x | y, chess.BB_RANKS[rank_pawn + 1: 8], 0)
+
             else :
-                if chess.BB_SQUARES[square] & chess.BB_RANK_2 :
-                    score += 10
-                elif chess.BB_SQUARES[square] & chess.BB_RANK_1 :
-                    score += 20
-
-            # Doubled pawns penalty
-            if board.pawns & chess.BB_FILES[chess.square_file(square)] > 1:
-                score -= 5
+                # do bitwise or on the list of ranks to get 1 bitmask
+                BB_ranks_ahead = reduce(lambda x, y: x | y, chess.BB_RANKS[0 : rank_pawn], 0)
 
 
+            BB_passed_pawn &= BB_ranks_ahead
+
+            #passed pawn
+            if not (BB_passed_pawn & BB_enemy_pawns):
+                score += 50
+
+
+            #Isolated pawn
+            if (prev_file_BB & chess.BB_SQUARES[square] == 0 and next_file_BB & chess.BB_SQUARES[square] == 0):
+                score-=30
+
+
+            # Double pawn penalty
+            BB_double_pawn = chess.BB_FILES[file_pawn] & BB_pawns
+            #convert bistmask to string and count how many 1s
+            if bin(BB_double_pawn).count('1') > 1:
+                score -= -10  #happens 2 times (for every doulbe pawn)
 
         return score
 
 
-    def evaluate_king_safety( sef ,board: chess.Board , active_player) :
-        king_safety = 0
-        if (board.pieces_mask(piece_type=chess.KING, color=active_player) & chess.BB_CORNERS ) :
-            king_safety += 1
 
-        #needs to be better
 
-        return king_safety
+
+
+    def pawn_shield(self ,board : chess.Board , player):
+
+
+            king_square = board.king(player)
+            BB_shield_squares = 0
+
+            file_king = chess.square_file(king_square)
+            rank_king = chess.square_rank(king_square)
+
+            BB_prev_file = chess.BB_FILES[file_king - 1 if file_king > 0 else 0]
+            BB_next_file = chess.BB_FILES[file_king + 1 if file_king < 7 else 7]
+
+            if (chess.square_rank(king_square) < 2) or (chess.square_rank(king_square) > 5 ):
+                if player == chess.WHITE :
+                    BB_shield_squares = chess.BB_RANKS[rank_king+1 if rank_king<7 else 7] & (chess.BB_FILES[file_king] |  BB_prev_file | BB_next_file)
+                else:
+                    BB_shield_squares = chess.BB_RANKS[rank_king-1 if rank_king>0 else 0] & (chess.BB_FILES[file_king] |  BB_prev_file | BB_next_file)
+
+
+            BB_pawns_shield = BB_shield_squares & board.pieces_mask(chess.PAWN , player)
+
+
+            #print("bin" , bin(BB_pawns_shield))
+            shielded_pawns = bin(BB_pawns_shield).count('1')
+
+
+
+            score = shielded_pawns  * 20
+
+            #penalty for no shield
+            if shielded_pawns == 0:
+                score -= 50  # Add a penalty for no pawns around the king
+
+
+            #penalty if opponent in adjencent open file
+            BB_enemy_pawn = board.pieces_mask(chess.PAWN , not player)
+            if (BB_next_file & BB_enemy_pawn) or (BB_prev_file & BB_enemy_pawn):
+                score -= 30
+
+            return score
+
+
+
+
+
+    def endgame(self , board : chess.Board , player ):
+
+        enemy = not player
+        endgame = 0
+
+
+        end_spec_color = (self.total_pieces_color(board , player) - self.total_pieces_color(board , enemy))/6
+
+        #enemy king in corner :
+        if board.pieces_mask(piece_type=chess.KING, color=enemy) & chess.BB_CORNERS:
+            endgame += 90
+        elif board.pieces_mask(piece_type=chess.KING, color=enemy) & self.bitmap_2x2_corners:
+            endgame += 60
+        elif board.pieces_mask(piece_type=chess.KING ,  color=enemy) & self.bitmap_3x3_corners :
+            endgame += 20
+
+
+        #distance between kings needs to close
+        player_king_square = board.pieces(piece_type=chess.KING, color=enemy).pop()
+        enemy_king_square = board.pieces(piece_type=chess.KING, color=player).pop()
+
+        dis = chess.square_manhattan_distance( player_king_square, enemy_king_square)
+        dis = 50/dis*3
+
+        return dis*end_spec_color
+
 
 
 
@@ -254,3 +303,5 @@ class Utility(ABC):
             value += 5
 
         return value
+
+

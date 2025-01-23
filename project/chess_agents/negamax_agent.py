@@ -1,17 +1,12 @@
 import math
-import operator
 from abc import ABC
-from copy import deepcopy
 import time
-
 import random
-from typing import Tuple, Union
-
 import chess
 from project.chess_utilities.utility import Utility
 
-"""A generic agent class"""
 
+"""A generic agent class"""
 
 class Agent(ABC):
 
@@ -78,12 +73,21 @@ class Agent(ABC):
 
         zobrist_key = board._transposition_key()    #not the best -> protected
 
-        if zobrist_key in self.transposition_table.keys():
+        if zobrist_key in self.transposition_table:
             self.translookupcount += 1
             entry = self.transposition_table[zobrist_key]
+
+            # check depth
             if entry['depth'] >= depth:
-                self.translookupcount_success+=1
-                return entry['value']
+                self.translookupcount_success += 1
+
+                # use the value if it matches the alpha-beta bounds
+                if entry['flag'] == 'EXACT':
+                    return entry['value']
+                elif entry['flag'] == 'UPPERBOUND' and entry['value'] <= alpha:
+                    return entry['value']
+                elif entry['flag'] == 'LOWERBOUND' and entry['value'] >= beta:
+                    return entry['value']
 
 
 
@@ -94,6 +98,7 @@ class Agent(ABC):
 
         best_move = None
         best_score = -math.inf
+        original_alpha = alpha
 
 
         sorted_moves = sorted(board.legal_moves, key=lambda move: self.utility.move_value(board, move), reverse=True)
@@ -108,9 +113,6 @@ class Agent(ABC):
             if board.can_claim_threefold_repetition():
                 board.pop()
                 continue
-
-
-            #check for mate -> store if found to make that move(enemy will want to avoid this)
 
 
             value = -self.negamax(board, depth - 1, init_depth, -alpha, -beta)
@@ -130,11 +132,22 @@ class Agent(ABC):
                 break
 
 
-        if(depth == init_depth) :
+        if depth == init_depth :
             self.utility.prev_bestValue = best_score
             self.utility.prev_bestMove = best_move
 
-        self.transposition_table[zobrist_key] = {'value': best_score, 'depth': depth}
+        # store position in transposition table with flag
+        flag = 'EXACT'
+        if best_score <= original_alpha:
+            flag = 'UPPERBOUND'
+        elif best_score >= beta:
+            flag = 'LOWERBOUND'
+
+        self.transposition_table[zobrist_key] = {
+            'value': best_score,
+            'depth': depth,
+            'flag': flag
+        }
 
         return best_score
 

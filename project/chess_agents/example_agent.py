@@ -1,4 +1,4 @@
-from project.chess_agents.agent import Agent
+from project.chess_agents.negamax_agent import Agent
 import chess
 from project.chess_utilities.utility import Utility
 import time

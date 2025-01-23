@@ -1,0 +1,123 @@
+import math
+import operator
+from abc import ABC
+from copy import deepcopy
+from datetime import time
+
+import random
+
+import chess
+from project.chess_utilities.utility import Utility
+
+"""A generic agent class"""
+
+
+class Agent(ABC):
+
+    def __init__(self, utility: Utility, time_limit_move: float) -> None:
+        """Setup the Search Agent"""
+        self.utility = utility
+        self.time_limit_move = time_limit_move
+
+    def calculate_move(self, board: chess.Board):
+
+
+
+        self.expanded_nodes = 0
+        self.utility.self_color = board.turn
+        self.utility.enemy_color = not board.turn
+        print(self.utility.enemy_color)
+
+        best_move = []
+        valueBestMove = -math.inf
+
+        alpha = -math.inf
+        beta = math.inf
+
+
+        # loop over first possible moves
+        for rootmove in board.:
+            rootmove : chess.legal_moves :
+            # preform the move
+            board.push(rootmove)
+            # get minmax value of move (min(False) cause were in the max loop for the first move)
+            value =  self.min_max(board, 3, alpha, beta, False)
+
+            alpha = max(alpha, value)
+
+            value += self.utility.begin(board)
+
+            # undo the move
+            board.pop()
+
+            if (value > valueBestMove):
+                valueBestMove = value
+                best_move = [rootmove]
+            elif (value == valueBestMove):
+                best_move.append(rootmove)
+
+
+        print("Minmax nodes : ", self.expanded_nodes)
+        return random.choice(best_move)
+
+
+
+
+
+
+
+
+
+
+
+
+    def min_max(self, board: chess.Board, depth, alpha, beta, trueIfMax):
+        if (depth == 0):
+            self.expanded_nodes = self.expanded_nodes + 1
+            return self.utility.board_value(board)
+
+        if (trueIfMax):  # we need to get the max from children
+            maxValue = -math.inf
+
+            for childMoves in board.legal_moves:
+
+                self.expanded_nodes = self.expanded_nodes + 1
+
+                board.push(childMoves)
+                value = self.min_max(board, depth - 1, alpha, beta, False)
+                board.pop()
+
+                maxValue = max(maxValue , value)
+                alpha = max(alpha, value)
+
+                if (beta <= alpha):
+                    break
+
+            return maxValue
+
+        elif not trueIfMax:  # we need to get the min from children
+            min_value = +math.inf
+            for childMoves in board.legal_moves:
+
+                self.expanded_nodes = self.expanded_nodes + 1
+
+                board.push(childMoves)
+                value = self.min_max(board, depth - 1, alpha, beta, True)
+                board.pop()
+
+                min_value = min(min_value, value)
+                beta = min(beta, value)
+
+                if (beta <= alpha):
+                    break
+
+            return min_value
+
+
+
+
+
+
+
+
+
